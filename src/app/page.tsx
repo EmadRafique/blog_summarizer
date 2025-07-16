@@ -4,11 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast, Toaster } from "sonner";
-import { Trash2 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import supabase from "@/lib/supabase";
 import ThemeToggle from "@/components/ThemeToggle";
-import SummarySkeleton from "@/components/ui/SummarySkeleton";
 import ParticlesBG from "@/components/ParticlesBG";
 
 type Summary = {
@@ -78,48 +76,15 @@ export default function Home() {
   const [summary, setSummary] = useState("");
   const [urduTranslation, setUrduTranslation] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [showBanner, setShowBanner] = useState(false);
-  const [savedSummaries, setSavedSummaries] = useState<Summary[]>([]);
   const summaryRef = useRef<HTMLDivElement | null>(null);
+
+  const fetchSummaries = async () => {
+    await supabase.from("summaries").select("*");
+  };
 
   useEffect(() => {
     fetchSummaries();
   }, []);
-
-  const fetchSummaries = async () => {
-    const { data, error } = await supabase
-      .from("summaries")
-      .select("*")
-      .order("id", { ascending: false });
-
-    if (error) {
-      console.error("Error fetching summaries:", error.message);
-    } else {
-      setSavedSummaries(data);
-    }
-  };
-
-  const handleDelete = async (id: number, url: string) => {
-    const confirm = window.confirm("Are you sure you want to delete this summary?");
-    if (!confirm) return;
-
-    const { error } = await supabase.from("summaries").delete().eq("id", id);
-
-    const mongoDelete = await fetch("/api/delete-content", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
-    });
-
-    if (error || !mongoDelete.ok) {
-      toast.error("Failed to fully delete summary", {
-        description: "It may still exist in one database.",
-      });
-    } else {
-      toast.success("Summary deleted from both MongoDB and Supabase!");
-      setSavedSummaries((prev) => prev.filter((item) => item.id !== id));
-    }
-  };
 
   const handleSubmit = async () => {
     if (!url.trim()) {
@@ -146,9 +111,6 @@ export default function Home() {
         toast.error("Failed to save static summary to Supabase.");
       } else {
         toast.success("Static summary saved successfully!");
-        fetchSummaries();
-        setShowBanner(true);
-        setTimeout(() => setShowBanner(false), 3000);
       }
 
       setUrl("");
@@ -170,8 +132,6 @@ export default function Home() {
       .from("summaries")
       .insert([{ url, summary: fallbackSummary }]);
 
-    setUrl("");
-
     setTimeout(() => {
       summaryRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 300);
@@ -184,9 +144,6 @@ export default function Home() {
       toast.success("Saved to Supabase + MongoDB!", {
         description: "Your summary is stored securely.",
       });
-      fetchSummaries();
-      setShowBanner(true);
-      setTimeout(() => setShowBanner(false), 3000);
     }
 
     setUrl("");
